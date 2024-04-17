@@ -10,7 +10,7 @@
 
 # Written by Petru Paler
 
-from BTL import BTFailure
+from .BTL import BTFailure
 
 
 def decode_int(x, f):
@@ -19,16 +19,16 @@ def decode_int(x, f):
     n = int(x[f:newf])
     if x[f] == '-':
         if x[f + 1] == '0':
-            raise ValueError
+            raise ValueError("int")
     elif x[f] == '0' and newf != f+1:
-        raise ValueError
+        raise ValueError("int")
     return (n, newf+1)
 
 def decode_string(x, f):
     colon = x.index(':', f)
     n = int(x[f:colon])
     if x[f] == '0' and colon != f+1:
-        raise ValueError
+        raise ValueError("string")
     colon += 1
     return (x[colon:colon+n], colon+n)
 
@@ -61,17 +61,14 @@ decode_func['7'] = decode_string
 decode_func['8'] = decode_string
 decode_func['9'] = decode_string
 
-def bdecode(x):
+def bdecode(x: str):
     try:
         r, l = decode_func[x[0]](x, 0)
-    except (IndexError, KeyError, ValueError):
-        raise BTFailure("not a valid bencoded string")
+    except (IndexError, KeyError, ValueError) as e:
+        raise BTFailure(f"not a valid bencoded string: {e}, {type(e)}")
     if l != len(x):
         raise BTFailure("invalid bencoded value (data after valid prefix)")
     return r
-
-from types import StringType, IntType, LongType, DictType, ListType, TupleType
-
 
 class Bencached(object):
 
@@ -103,8 +100,8 @@ def encode_list(x, r):
 
 def encode_dict(x,r):
     r.append('d')
-    ilist = x.items()
-    ilist.sort()
+    ilist = [(k, v) for k , v in x.items()]
+    ilist.sort(key=lambda x: x[0])
     for k, v in ilist:
         r.extend((str(len(k)), ':', k))
         encode_func[type(v)](v, r)
@@ -112,18 +109,15 @@ def encode_dict(x,r):
 
 encode_func = {}
 encode_func[Bencached] = encode_bencached
-encode_func[IntType] = encode_int
-encode_func[LongType] = encode_int
-encode_func[StringType] = encode_string
-encode_func[ListType] = encode_list
-encode_func[TupleType] = encode_list
-encode_func[DictType] = encode_dict
+encode_func[int] = encode_int
+encode_func[str] = encode_string
+encode_func[list] = encode_list
+encode_func[tuple] = encode_list
+encode_func[dict] = encode_dict
 
-try:
-    from types import BooleanType
-    encode_func[BooleanType] = encode_bool
-except ImportError:
-    pass
+
+encode_func[bool] = encode_bool
+
 
 def bencode(x):
     r = []
